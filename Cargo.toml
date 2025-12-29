@@ -1,0 +1,11 @@
+[package]
+name = "frontend"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+logos = "0.16.0"
+
+# legit just for clean debugging a couple deps
+ariadne = "0.4"
+strip-ansi-escapes = "0.2"
