@@ -56,5 +56,5 @@ obj = Thing::new();
 
 // desired behavior
 // char = 'c              // throws untermed char error
-// string = "untermed     // throws untermed string error
-// @                      // throws unknown token error
+string = "untermed     // throws untermed string error
+@                      // throws unknown token error

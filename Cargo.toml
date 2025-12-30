@@ -3,9 +3,14 @@ name = "frontend"
 version = "0.0.1"
 edition = "2024"
 
+# 31 deps total
 [dependencies]
+# logos is really the fattest at 18 deps
 logos = "0.16.0"
 
-# legit just for clean debugging a couple deps
+# using this over the other 2 gets chumsky down to 8 deps
+chumsky = { version = "0.11.2", default-features = false, features = ["std"] }
+
+# ariadne is 4 deps, ansi escapes is 1 (5 total, light shit)
 ariadne = "0.4"
 strip-ansi-escapes = "0.2"

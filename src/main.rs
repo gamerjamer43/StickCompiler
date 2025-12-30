@@ -4,42 +4,52 @@ mod lexer;
 // gotta work on this name but now im tired
 use crate::lexer::{diagnostic::dump, lex::lex, token::Token};
 
-use std::{env::{Args, args}, fs::read_to_string, iter::Skip, process::exit};
+use std::{
+    env::{Args, args},
+    fs::read_to_string,
+    iter::Skip,
+    process::exit,
+};
 
 fn main() {
     // handle cl args
     let mut args: Skip<Args> = args().skip(1);
     let mut path: Option<String> = None;
-    let mut debug: bool = false;
+
+    // flags live in a vector (0 = debug, 1 = fast fail. maybe hashmap but thats dumb cemantics i wanna setup the parser)
+    let mut flags: Vec<bool> = vec![false; 2];
     while let Some(a) = args.next() {
         match a.as_str() {
-            "-d" | "--debug" => debug = true,
+            "-d" | "--debug" => flags[0] = true,
+            "-ff" | "--fastfail" => flags[1] = true,
             "--" => {
-                if let Some(p) = args.next() { path = Some(p); }
+                if let Some(p) = args.next() {
+                    path = Some(p);
+                }
                 break;
             }
 
             // unknown args
-            s if s.starts_with('-') => {
-                eprintln!("unknown flag: {}", s);
-                exit(2);
+            s if s.starts_with('-') => usage!("unknown flag: {}\n", s),
+            s => {
+                if path.is_none() {
+                    path = Some(s.to_string())
+                }
             }
-            s => if path.is_none() { path = Some(s.to_string()) },
         }
     }
 
-    let path = path.unwrap_or_else(|| {
-        eprintln!("usage: lexer <file>");
-        exit(2);
+    // try and open properly
+    let path: String = path.unwrap_or_else(|| {
+        usage!();
     });
-
-    let src = read_to_string(&path).unwrap_or_else(|e| {
+    let src: String = read_to_string(&path).unwrap_or_else(|e| {
         eprintln!("failed to read {path}: {e}");
-        exit(2);
+        exit(0);
     });
 
     // TODO: parse the returned tokens into an AST
-    let _tokens: Vec<Token<'_>> = match lex(&path, &src, debug) {
+    let _tokens: Vec<Token<'_>> = match lex(&path, &src, flags[0], flags[1]) {
         Ok(tokens) => tokens,
 
         // any errors
@@ -48,7 +58,8 @@ fn main() {
                 eprintln!("{d}");
             }
 
-            if debug {
+            // debug flag
+            if flags[0] {
                 dump(&errors, "lastrun.log")
                     .unwrap_or_else(|_| eprintln!("Failed to dump errors."));
             }
