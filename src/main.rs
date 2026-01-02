@@ -1,5 +1,6 @@
 //! docs here soon i'm lazy as fuck
 mod lexer;
+mod parser;
 
 // gotta work on this name but now im tired
 use crate::lexer::{diagnostic::dump, lex::lex, token::Token};

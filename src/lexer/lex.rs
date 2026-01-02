@@ -19,7 +19,11 @@ pub fn lex<'a>(
     let mut lex: Lexer<'_, Token> = Token::lexer(src);
     while let Some(res) = lex.next() {
         match res {
-            Ok(tok) => tokens.push(tok),
+            Ok(tok) => {
+                // print token info if debug is on
+                if debug { println!("Token({tok:?})"); }
+                tokens.push(tok)
+            }
 
             // any errors have types in the SyntaxError enum, Unknown by default
             Err(err) => {
@@ -33,23 +37,21 @@ pub fn lex<'a>(
                 errors.push(diagnostic);
 
                 // fail immediately on ff
-                if fastfail {
-                    break;
-                }
+                if fastfail { break; }
                 continue;
             }
         };
     }
 
     // handle debug prints
+    println!(
+        "Lexed {} bytes, {linecount} lines into {} tokens. Took {}s.",
+        src.len(),
+        tokens.len(),
+        start.elapsed().as_secs_f64()
+    );
+    
     if debug {
-        println!(
-            "Lexed {} bytes, {linecount} lines into {} tokens. Took {}s.",
-            src.len(),
-            tokens.len(),
-            start.elapsed().as_secs_f64()
-        );
-
         // dump to log
         if !errors.is_empty() {
             dump(&errors, "lastrun.log").unwrap_or_else(|_| eprintln!("Failed to dump errors."));

@@ -2,15 +2,11 @@
 use super::error::{SyntaxError, err};
 use logos::{Logos, skip};
 
-// the entire token spec. this also doubles as the lexer itself pretty much, as we j
+// the entire token spec. this also doubles as the lexer itself when we run Token::lexer()
 #[derive(Logos, Default, Debug, PartialEq)]
 #[logos(error(SyntaxError<'s>, err))] // TODO: fully understand why 's shuts this up, and why i can't use '_ or 'src
 #[logos(skip r"[ \t\n\f\r]+")] // ignore tabs, newlines, form feeds, and carriage returns
 pub enum Token<'src> {
-    // reuse this if needed
-    // #[token(r#"match")]
-    // Keyword,
-
     // comments (skipped)
     #[regex(r"//[^\r\n]*", skip, allow_greedy = true)]
     #[regex(r"/\*([^*]|\*+[^*/])*\*+/", skip)]
@@ -44,7 +40,7 @@ pub enum Token<'src> {
     #[token("::")]  DoubleColon,
     #[token("->")]  Arrow,
     #[token("=>")]  FatArrow,
-    #[token("|->")] Match,
+    #[token("|->")] Branch,
 
     // ranges and varargs style (may not use)
     #[token("...")] Elipses,
@@ -94,6 +90,36 @@ pub enum Token<'src> {
     #[token("false", |_| false)]
     #[token("true", |_| true)]
     Bool(bool),
+
+    // fine ig i'll do control keywords in here too
+    #[token("if")]       If,
+    #[token("else")]     Else,
+    #[token("fn")]       Fn,
+    #[token("while")]    While,
+    #[token("do")]       Do,
+    #[token("for")]      For,
+    #[token("in")]       In,
+    #[token("return")]   Return,
+    #[token("break")]    Break,
+    #[token("continue")] Continue,
+    #[token("match")]    Match,
+    #[token("import")]   Import,
+    #[token("from")]     From,
+
+
+    // type qualifiers/storage specifiers
+    #[token("const")]    Const,
+    #[token("static")]   Static,
+    #[token("public")]   Public,
+
+    // object oriented and imperative shit
+    #[token("class")]    Class,
+    #[token("struct")]   Struct,
+    #[token("enum")]     Enum,
+
+    // lifetimes like 'a (may add to give the user more handlage, trying to allow for any paradigm the user wants)
+    // #[regex(r"'[A-Za-z_][A-Za-z0-9_]*", |lex| lex.slice())]
+    // Lifetime(&'src str),
 
     /// identifiers cannot start with a number, and can only contain A-Z, a-z, 0-9, and _
     #[regex("[A-Za-z_][A-Za-z0-9_]*", |lex| lex.slice())]
