@@ -1,4 +1,7 @@
-// the lexer itself, the big beef
+use core::fmt;
+use std::fmt::Display;
+
+// the lexer itself, the big beef (logos specs look a lil ugly so don't count this in any PRs)
 use super::error::{SyntaxError, err};
 use logos::{Logos, skip};
 
@@ -143,4 +146,39 @@ pub enum Token<'src> {
     // this will throw a SyntaxError
     #[default]
     Error,
+}
+
+// everything im not too lazy to add a display for
+impl<'src> Display for Token<'src> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::EqEq        => f.write_str("=="),
+            Token::NotEq       => f.write_str("!="),
+            Token::LessEq      => f.write_str("<="),
+            Token::GreaterEq   => f.write_str(">="),
+
+            Token::Plus        => f.write_str("+"),
+            Token::Minus       => f.write_str("-"),
+            Token::Star        => f.write_str("*"),
+            Token::Slash       => f.write_str("/"),
+
+            Token::Assign      => f.write_str("="),
+
+            Token::If          => f.write_str("if"),
+            Token::Else        => f.write_str("else"),
+            Token::Fn          => f.write_str("fn"),
+
+            Token::Bool(v)     => write!(f, "{v}"),
+            Token::Identifier(s)
+            | Token::LitString(s)
+            | Token::LitChar(s)
+            | Token::LitFloat(s)
+            | Token::LitInteger(s) => f.write_str(s),
+
+            Token::Error       => f.write_str("<error>"),
+
+            // fallback for everything else
+            _ => write!(f, "{:?}", self),
+        }
+    }
 }

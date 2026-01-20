@@ -3,7 +3,10 @@ mod lexer;
 mod parser;
 
 // gotta work on this name but now im tired
-use crate::lexer::{diagnostic::dump, lex::lex, token::Token};
+use crate::{
+    lexer::{diagnostic::dump, lex::lex, token::Token},
+    parser::{ast::Stmt, parse::Parser},
+};
 
 use std::{
     env::{Args, args},
@@ -50,7 +53,7 @@ fn main() {
     });
 
     // TODO: parse the returned tokens into an AST
-    let _tokens: Vec<Token<'_>> = match lex(&path, &src, flags[0], flags[1]) {
+    let tokens: Vec<Token<'_>> = match lex(&path, &src, flags[0], flags[1]) {
         Ok(tokens) => tokens,
 
         // any errors
@@ -68,6 +71,18 @@ fn main() {
             println!("\n(!) {} errors found.", errors.len());
             exit(0);
         }
+    };
+
+    let mut parser = Parser {
+        path: &path,
+        src: &src,
+        tokens: &tokens,
+        pos: 0,
+    };
+
+    let _ast: Vec<Stmt<'_>> = match parser.parse(flags[0]) {
+        Ok(ok) => ok,
+        Err(_err) => exit(0),
     };
 
     // parsing down here.

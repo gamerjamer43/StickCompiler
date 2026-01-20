@@ -5,14 +5,17 @@ use super::{
 use logos::{Lexer, Logos};
 use std::{ops::Range, result::Result, time::Instant};
 
-pub fn lex<'a>(
-    path: &'a str,
-    src: &'a str,
+// would like guidance as to if i'm doing this cleanly or if i'm nesting too much
+// i like the if let syntax frm ocaml carrying over. v heavy emphasis on pattern matching
+// src is a horrible name its just the source file
+pub fn lex<'path, 'src>(
+    path: &'path str,
+    src: &'src str,
     debug: bool,
     fastfail: bool,
-) -> Result<Vec<Token<'a>>, Vec<Diagnostic<'a, 'a>>> {
-    let mut errors: Vec<Diagnostic> = vec![];
-    let mut tokens: Vec<Token<'_>> = vec![];
+) -> Result<Vec<Token<'src>>, Vec<Diagnostic<'path, 'src>>> {
+    let mut errors: Vec<Diagnostic<'path, 'src>> = Vec::new();
+    let mut tokens: Vec<Token<'src>> = Vec::new();
     let start: Instant = Instant::now();
 
     let linecount: usize = src.lines().count();
@@ -21,7 +24,9 @@ pub fn lex<'a>(
         match res {
             Ok(tok) => {
                 // print token info if debug is on
-                if debug { println!("Token({tok:?})"); }
+                if debug {
+                    println!("Token({tok:?})");
+                }
                 tokens.push(tok)
             }
 
@@ -37,7 +42,9 @@ pub fn lex<'a>(
                 errors.push(diagnostic);
 
                 // fail immediately on ff
-                if fastfail { break; }
+                if fastfail {
+                    break;
+                }
                 continue;
             }
         };
@@ -50,13 +57,10 @@ pub fn lex<'a>(
         tokens.len(),
         start.elapsed().as_secs_f64()
     );
-    
-    if debug {
-        // dump to log
-        if !errors.is_empty() {
-            dump(&errors, "lastrun.log").unwrap_or_else(|_| eprintln!("Failed to dump errors."));
-            println!("Dumped all errors to a log file.");
-        }
+
+    if debug && !errors.is_empty() {
+        dump(&errors, "lastrun.log").unwrap_or_else(|_| eprintln!("Failed to dump errors."));
+        println!("Dumped all errors to a log file.");
     }
 
     // any errors stop at the lexing stage

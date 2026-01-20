@@ -1,6 +1,9 @@
 /* test spec for all types of token in the language to make sure they parse right
 it's gonna look ugly but this is prob not how the language will look */
 
+// all i got in the parser frn
+break continue
+
 // normal ints and operators
 x = 1_000 + 2 * 3 - 4 / 5 % 2;
 

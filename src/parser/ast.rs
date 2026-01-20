@@ -1,3 +1,4 @@
+// keeping this on until everything in the parser is done...
 #![allow(dead_code)]
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -23,16 +24,24 @@ pub enum Literal<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type<'src> {
     // one byte
-    I8, U8, Bool, Char,
+    I8,
+    U8,
+    Bool,
+    Char,
 
     // two byte
-    I16, U16,
+    I16,
+    U16,
 
     // four byte
-    I32, U32, F32,
+    I32,
+    U32,
+    F32,
 
     // eight byte
-    I64, U64, F64,
+    I64,
+    U64,
+    F64,
 
     // void/unit
     Unit,
@@ -56,7 +65,6 @@ pub enum Type<'src> {
         params: Vec<Type<'src>>,
         ret: Box<Type<'src>>,
     },
-
     // if i add a borrow system
     // /// `&T` / `&mut T`
     // Ref {
@@ -104,16 +112,30 @@ pub enum Subscript<'src> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinOp {
     // arithmetic
-    Add, Sub, Mul, Div, Mod,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
 
     // equality operations
-    Eq, NotEq, Less, LessEq, Greater, GreaterEq,
+    Eq,
+    NotEq,
+    Less,
+    LessEq,
+    Greater,
+    GreaterEq,
 
     // logical operations
-    And, Or,
+    And,
+    Or,
 
     // bitwise
-    BitAnd, BitOr, BitXor, Shl, Shr,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
 }
 
 /// and the 3 unary operators
@@ -131,10 +153,18 @@ pub enum AssignOp {
     Assign,
 
     // arithmetic assignment
-    AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    ModAssign,
 
     // bitwise assignment
-    AndAssign, OrAssign, XorAssign, ShlAssign, ShrAssign,
+    AndAssign,
+    OrAssign,
+    XorAssign,
+    ShlAssign,
+    ShrAssign,
 }
 
 /// general expressions which will be recursively parsed using chumsky
@@ -150,7 +180,7 @@ pub enum Expr<'src> {
 
     // assignments
     Assign {
-        op:  AssignOp,
+        op: AssignOp,
         lhs: LeftSide<'src>,
         rhs: Box<Expr<'src>>,
     },
@@ -163,15 +193,15 @@ pub enum Expr<'src> {
 
     // binary ops
     Binary {
-        op:  BinOp,
+        op: BinOp,
         lhs: Box<Expr<'src>>,
-        rhs: Box<Expr<'src>>
+        rhs: Box<Expr<'src>>,
     },
 
     // function call
     Call {
         func: Box<Expr<'src>>,
-        args: Vec<Expr<'src>>
+        args: Vec<Expr<'src>>,
     },
 
     // field access (a.b)
@@ -233,7 +263,6 @@ pub enum Pattern<'src> {
         start: Option<Box<Expr<'src>>>,
         end: Option<Box<Expr<'src>>>,
     },
-
     // shit i have to add later
     // Tuple(Vec<Pattern<'src>>),
     // Array
@@ -248,7 +277,6 @@ pub struct Branch<'src> {
     pub guard: Option<Box<Expr<'src>>>,
     pub body: Box<Expr<'src>>,
 }
-
 
 /// all types of statement. either control or a normal expression
 #[derive(Debug, Clone, PartialEq)]
@@ -268,6 +296,6 @@ pub enum Stmt<'src> {
 
         // may drop this, but adding immutability for like tuples
         // forces a reassignment to change so may keep this as it has its purpose
-        mutable: bool
+        mutable: bool,
     },
 }
