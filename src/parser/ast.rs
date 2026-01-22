@@ -146,25 +146,25 @@ pub enum UnaryOp {
     BitNot,
 }
 
-/// those same operators but assignment
-#[derive(Debug, Clone, PartialEq)]
+/// those same operators but assignment... 1 to 1 mapping frm tokens. this does require a copy tho
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssignOp {
     // basic assignment
     Assign,
 
     // arithmetic assignment
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
-    ModAssign,
+    PlusEq,
+    MinusEq,
+    StarEq,
+    SlashEq,
+    PercentEq,
 
     // bitwise assignment
-    AndAssign,
-    OrAssign,
-    XorAssign,
-    ShlAssign,
-    ShrAssign,
+    AndEq,
+    OrEq,
+    XorEq,
+    ShlEq,
+    ShrEq,
 }
 
 /// general expressions which will be recursively parsed using chumsky
