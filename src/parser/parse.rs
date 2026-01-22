@@ -293,7 +293,7 @@ impl<'src, 't> Parser<'src, 't> {
         
             // temporary solution for nimpl, i need to link ariadne
             _ => {
-                println!("not implemented: {tok:?}");
+                // add this back w a debug flag idk if debug { println!("not implemented: {tok:?}"); }
                 Expr::Unknown
             }
         }
