@@ -50,6 +50,7 @@ pub enum Token<'src> {
     #[token("..")]  DotDot,
 
     // arithmetic
+    #[token("**")]  StarStar,
     #[token("+")]   Plus,
     #[token("-")]   Minus,
     #[token("*")]   Star,
@@ -148,7 +149,7 @@ pub enum Token<'src> {
     Error,
 }
 
-// everything im not too lazy to add a display for
+// everything im not too lazy to add a display for. gotta add some more obv
 impl<'src> Display for Token<'src> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

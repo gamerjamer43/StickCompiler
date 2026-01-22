@@ -73,6 +73,7 @@ fn main() {
         }
     };
 
+    if flags[0] { press_btn_continue::wait("Press any button to continue to parsing.").unwrap(); }
     let mut parser = Parser {
         path: &path,
         src: &src,
@@ -85,5 +86,5 @@ fn main() {
         Err(_err) => exit(0),
     };
 
-    // parsing down here.
+    if flags[0] { press_btn_continue::wait("Press any button to continue to semantic analysis and the opt layer. (not done yet)").unwrap(); }
 }

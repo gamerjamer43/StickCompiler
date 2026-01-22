@@ -91,10 +91,10 @@ pub enum LeftSide<'src> {
         name: Ident<'src>,
     },
 
-    // index (tuple/array[i])
-    Index {
+    // subscript (tuple/array[i] or [i..j]/[..i])
+    Subscript {
         obj: Box<Expr<'src>>,
-        index: Box<Expr<'src>>,
+        sub: Subscript<'src>,
     },
 }
 
@@ -106,6 +106,13 @@ pub enum Subscript<'src> {
         start: Option<Box<Expr<'src>>>,
         end: Option<Box<Expr<'src>>>,
     },
+}
+
+/// both types of operation that can be infixed
+#[derive(Debug)]
+pub enum InfixKind {
+    Binary(BinOp),
+    Assign(AssignOp),
 }
 
 /// all binary operators provided natively
@@ -241,6 +248,8 @@ pub enum Expr<'src> {
     },
 
     Block(Vec<Stmt<'src>>),
+
+    Unknown,
 }
 
 /// helper for the specific thing matched on a pattern match

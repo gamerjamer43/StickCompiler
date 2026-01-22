@@ -25,7 +25,7 @@ pub fn lex<'path, 'src>(
             Ok(tok) => {
                 // print token info if debug is on
                 if debug {
-                    println!("Token({tok:?})");
+                    println!("[bytes {:?}]: {tok} ", lex.span());
                 }
                 tokens.push(tok)
             }

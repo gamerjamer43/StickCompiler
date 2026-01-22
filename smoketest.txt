@@ -1,9 +1,6 @@
 /* test spec for all types of token in the language to make sure they parse right
 it's gonna look ugly but this is prob not how the language will look */
 
-// all i got in the parser frn
-break continue
-
 // normal ints and operators
 x = 1_000 + 2 * 3 - 4 / 5 % 2;
 
@@ -53,9 +50,10 @@ match case:
 call(x, y);
 
 // opcodes NEWARR, NEWTABLE, NEWOBJ
-arr = [1, 2, 3];
-table = {a: 1, b: 2};
-obj = Thing::new();
+// TODO: implement at parse stage
+// arr = [1, 2, 3];
+// table = {a: 1, b: 2};
+// obj = Thing::new();
 
 // desired behavior
 // char = 'c              // throws untermed char error

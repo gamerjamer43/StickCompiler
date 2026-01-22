@@ -39,6 +39,7 @@ version = "0.0.1"
 dependencies = [
  "ariadne",
  "logos",
+ "press-btn-continue",
  "strip-ansi-escapes",
 ]
 
@@ -81,6 +82,12 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+
+[[package]]
+name = "press-btn-continue"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea399120e7666ff7299eff8f5a6cbf7f9be5e83ad7827be6bbc707481aad4e23"
 
 [[package]]
 name = "proc-macro2"
