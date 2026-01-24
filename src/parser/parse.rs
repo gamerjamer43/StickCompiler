@@ -50,8 +50,8 @@ impl<'src, 't> Parser<'src, 't> {
     }
 
     // TODO: add plain ranges. val = 1..3
-    // TODO 2: also add typed decls. i64 int = 1;
-    // TODO 3: figure out how to use semicolons. prolly for one line statements use it as a seperator, but no semicolon required so
+    // TODO 2: add dest and type based decls. decide i64 int = 1 or let int: i64 = 1 and const, global, maybe static too: const i64 int = 1 or let const int: i64 = 1
+    // TODO 3: make semicolons OPTIONAL at the end of a line (or to end a statement)
     #[inline]
     fn parse_expr(&mut self, min: u8) -> Expr<'src> {
         // check for anything before
@@ -101,12 +101,22 @@ impl<'src, 't> Parser<'src, 't> {
                         // expect r paren
                         self.expect(|t: &Token<'_>| matches!(t, Token::RParen)).expect("missing ')'");
 
-                        // also boxing to avoid infinite recursive eval
-                        let lvalue: Box<Expr<'_>> = Box::new(left);
-                        left = Expr::Call { func: lvalue, args };
+                        // method calls exist, so there's a match here
+                        left = match left {
+                            Expr::Field { obj, name } => Expr::Method {
+                                receiver: obj,
+                                method: name,
+                                args,
+                            },
+
+                            // also boxing to avoid infinite recursive eval
+                            other => Expr::Call {
+                                func: Box::new(other),
+                                args,
+                            },
+                        };
                     }
 
-                    // TODO: add method calls (maybe just wrap call around a field?)
                     Token::Dot => {
                         self.advance();
 
@@ -120,7 +130,7 @@ impl<'src, 't> Parser<'src, 't> {
                         };
 
                         let lvalue: Box<Expr<'_>> = Box::new(left);
-                        left = Expr::Field { obj: lvalue, name };
+                        left = Expr::Field { obj: lvalue, name: Ident(name) };
                     }
 
                     // slices/index
@@ -242,8 +252,8 @@ impl<'src, 't> Parser<'src, 't> {
                     let rhs: Expr<'_> = self.parse_expr(op_prec);
 
                     let lhs = match left {
-                        Expr::Ident(name) => LeftSide::Var(Ident(name)),
-                        Expr::Field { obj, name } => LeftSide::Field { obj, name: Ident(name) },
+                        Expr::Ident(ident) => LeftSide::Var(ident),
+                        Expr::Field { obj, name } => LeftSide::Field { obj, name },
                         Expr::Index { obj, sub } => LeftSide::Subscript { obj, sub },
                         _ => {
                             println!("not implemented: or something went wrong {tok:?}");
@@ -272,19 +282,19 @@ impl<'src, 't> Parser<'src, 't> {
             Token::Minus       => Expr::Unary { op: UnaryOp::Neg, expr: Box::new(self.parse_expr(12)) },
             Token::LogicalNot  => Expr::Unary { op: UnaryOp::Not, expr: Box::new(self.parse_expr(12)) },
             Token::BitNot      => Expr::Unary { op: UnaryOp::BitNot, expr: Box::new(self.parse_expr(12)) },
+
+            Token::LParen => {
+                let inner = self.parse_expr(0);
+                self.expect(|t: &Token<'_>| matches!(t, Token::RParen)).expect("missing ')'");
+                inner
+            }
         
-            Token::Identifier(name) => Expr::Ident(name),
+            Token::Identifier(name) => Expr::Ident(Ident(name)),
             Token::LitInteger(n)    => Expr::Literal(Literal::Int(n)),
             Token::LitFloat(n)      => Expr::Literal(Literal::Float(n)),
             Token::LitString(s)     => Expr::Literal(Literal::String(s)),
             Token::LitChar(c)       => Expr::Literal(Literal::Char(c)),
             Token::Bool(b)          => Expr::Literal(Literal::Bool(*b)),
-        
-            // Token::LParen => {
-            //     let e = self.parse_expr(0);
-            //     self.expect(|t| matches!(t, Token::RParen)).expect("missing ')'");
-            //     e
-            // }
         
             // Token::If => self.parse_if_expr(),
             // Token::While => self.parse_while_expr(),
@@ -309,9 +319,9 @@ impl<'src, 't> Parser<'src, 't> {
                 // idents (read parse_ident)
                 Token::Identifier(_) => nodes.push(Stmt::Expr(self.parse_expr(0))),
 
-                // control flow
-                Token::Break => nodes.push(Stmt::Break),
-                Token::Continue => nodes.push(Stmt::Continue),
+                // control flow: this dont seem right but...
+                // Token::Break => nodes.push(Stmt::Break),
+                // Token::Continue => nodes.push(Stmt::Continue),
 
                 // TODO: wire this to the SyntaxError setup i alr have
                 _ => {
@@ -324,7 +334,12 @@ impl<'src, 't> Parser<'src, 't> {
             if debug {
                 println!("Parsed: \n{:#?}", nodes.last().unwrap());
             }
+
+            // TODO: make the compiler warn on unnecessary semicolon
             self.advance();
+            while matches!(self.cur(), Some(Token::Semicolon)) {
+                self.advance();
+            }
         }
 
         println!(

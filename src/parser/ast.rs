@@ -1,8 +1,17 @@
 // keeping this on until everything in the parser is done...
 #![allow(dead_code)]
 
+use core::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Ident<'src>(pub &'src str);
+
+// make ident print as just the value inside
+impl<'src> fmt::Display for Ident<'src> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// literals for all the types below
 #[derive(Debug, Clone, PartialEq)]
@@ -65,14 +74,15 @@ pub enum Type<'src> {
         params: Vec<Type<'src>>,
         ret: Box<Type<'src>>,
     },
+    
     // if i add a borrow system
-    // /// `&T` / `&mut T`
+    // `&T` / `&mut T`
     // Ref {
     //     mutable: bool,
     //     inner: Box<Type<'src>>,
     // },
 
-    // /// `*T` / `*mut T`
+    // `*T` / `*mut T`
     // Ptr {
     //     mutable: bool,
     //     inner: Box<Type<'src>>,
@@ -177,10 +187,11 @@ pub enum AssignOp {
 /// general expressions which will be recursively parsed using chumsky
 /// box anything recursive, as otherwise the enum will be infinite, and rust needs
 /// to know the size at compile time.
+/// TODO: implement constant expressions (ConstExpr) which are evaluated down to a fixed integer value
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
     // var names
-    Ident(&'src str),
+    Ident(Ident<'src>),
 
     // literal values
     Literal(Literal<'src>),
@@ -214,7 +225,22 @@ pub enum Expr<'src> {
     // field access (a.b)
     Field {
         obj: Box<Expr<'src>>,
-        name: &'src str,
+        name: Ident<'src>,
+
+        // TODO: figure out ->
+        // whether this access is a pointer or not
+        // ptr: bool,
+        
+        // whether the compiler should automatically deref this value or not (not implemented yet so always false)
+        // deref: bool,
+    },
+
+    // method calls (a.b(); a.b().c(); a().b() and etc.)
+    Method {
+        // receiver isnt always just an obj, it can be a chained call
+        receiver: Box<Expr<'src>>, 
+        method: Ident<'src>,
+        args: Vec<Expr<'src>> 
     },
 
     // index or slice (a[b] or a[b..c])
@@ -232,7 +258,7 @@ pub enum Expr<'src> {
 
     While {
         cond: Box<Expr<'src>>,
-        body: Box<Expr<'src>>,
+        body: Box<Stmt<'src>>,
     },
 
     Match {
@@ -244,7 +270,7 @@ pub enum Expr<'src> {
     For {
         name: &'src str,
         iter: Box<Expr<'src>>,
-        body: Box<Expr<'src>>,
+        body: Box<Stmt<'src>>,
     },
 
     Block(Vec<Stmt<'src>>),
@@ -284,7 +310,7 @@ pub enum Pattern<'src> {
 pub struct Branch<'src> {
     pub pattern: Pattern<'src>,
     pub guard: Option<Box<Expr<'src>>>,
-    pub body: Box<Expr<'src>>,
+    pub body: Stmt<'src>,
 }
 
 /// all types of statement. either control or a normal expression
