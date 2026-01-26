@@ -22,7 +22,7 @@ pub fn lex<'path, 'src>(
         match res {
             Ok(tok) => {
                 // print token info if debug is on
-                if debug {
+                if debug && tok != Token::Newline {
                     println!("[bytes {:?}]: {tok} ", lex.span());
                 }
                 tokens.push(tok)

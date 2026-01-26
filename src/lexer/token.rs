@@ -8,12 +8,15 @@ use logos::{Logos, skip};
 // the entire token spec. this also doubles as the lexer itself when we run Token::lexer()
 #[derive(Logos, Default, Debug, PartialEq)]
 #[logos(error(SyntaxError<'s>, lex_err))] // TODO: fully understand why 's shuts this up, and why i can't use '_ or 'src
-#[logos(skip r"[ \t\n\f\r]+")] // ignore tabs, newlines, form feeds, and carriage returns
+#[logos(skip r"[ \t\f\r]+")] // ignore tabs, form feeds, and carriage returns
 pub enum Token<'src> {
     // comments (skipped)
-    #[regex(r"//[^\r\n]*", skip, allow_greedy = true)]
+    #[regex(r"//[^\r]*", skip, allow_greedy = true)]
     #[regex(r"/\*([^*]|\*+[^*/])*\*+/", skip)]
     Comment,
+
+    // newlines (also skipped but either that or a semicolon is forced to seperate statements)
+    #[regex(r"\n")] Newline,
 
     // equality and comparisons
     #[token("==")]  EqEq,

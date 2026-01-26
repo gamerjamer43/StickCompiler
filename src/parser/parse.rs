@@ -27,6 +27,12 @@ impl<'src, 't> Parser<'src, 't> {
     }
 
     #[inline]
+    fn matches(&self, matched: &Token<'src>) -> bool {
+        let tok: &Token<'_> = self.cur().unwrap_or(&Token::Error);
+        tok == matched
+    }
+
+    #[inline]
     fn expect<F>(&mut self, f: F) -> Option<&Token<'src>>
     where
         F: FnOnce(&Token<'_>) -> bool,
@@ -84,20 +90,20 @@ impl<'src, 't> Parser<'src, 't> {
 
                         // eat as many args as possible. default to take 8 before resizing then its ur problem lmao
                         let mut args: Vec<Expr<'_>> = Vec::with_capacity(8);
-                        if !matches!(self.cur(), Some(Token::RParen)) {
+                        if !self.matches(&Token::RParen) {
                             args.push(self.parse_expr(0));
 
                             // match commas (and ending parenthesis)
-                            while matches!(self.cur(), Some(Token::Comma)) {
+                            while self.matches(&Token::Comma) {
                                 self.advance();
-                                if matches!(self.cur(), Some(Token::RParen)) { break; }
+                                if self.matches(&Token::RParen) { break; }
 
                                 // evaluate THEN push
                                 args.push(self.parse_expr(0));
                             }
 
                             // malformed calls
-                            if !matches!(self.cur(), Some(Token::RParen)) { panic!("expected ',' or ')' in call. still have yet to add an error system"); }
+                            if !self.matches(&Token::RParen){ panic!("expected ',' or ')' in call. still have yet to add an error system"); }
                         }
 
                         // expect r paren
@@ -141,11 +147,11 @@ impl<'src, 't> Parser<'src, 't> {
                         self.advance();
 
                         // slices are denoted [start..end], [start..] or [..end]
-                        let sub: Subscript<'_> = if matches!(self.cur(), Some(Token::DotDot)) {
+                        let sub: Subscript<'_> = if self.matches(&Token::DotDot) {
                             self.advance();
 
                             // match the end bracket or error
-                            let end: Option<Box<Expr<'_>>> = if !matches!(self.cur(), Some(Token::RBracket)) {
+                            let end: Option<Box<Expr<'_>>> = if !self.matches(&Token::RBracket) {
                                 Some(Box::new(self.parse_expr(0)))
                             } else { None };
 
@@ -155,11 +161,11 @@ impl<'src, 't> Parser<'src, 't> {
                         else {
                             // otherwise try and evaluate out whatever is inside, start then end
                             let start: Expr<'_> = self.parse_expr(0);
-                            if matches!(self.cur(), Some(Token::DotDot)) {
+                            if self.matches(&Token::DotDot) {
                                 self.advance();
 
                                 // if nothing matches its [i..]
-                                let end: Option<Box<Expr<'_>>> = if !matches!(self.cur(), Some(Token::RBracket)) {
+                                let end: Option<Box<Expr<'_>>> = if !self.matches(&Token::RBracket) {
                                     Some(Box::new(self.parse_expr(0)))
                                 } else { None };
 
@@ -322,6 +328,12 @@ impl<'src, 't> Parser<'src, 't> {
 
         while let Some(cur) = self.cur() {
             match cur {
+                // skip newlines
+                Token::Newline => {
+                    self.advance();
+                    continue
+                },
+
                 // idents (read parse_ident)
                 Token::Identifier(_) => nodes.push(Stmt::Expr(self.parse_expr(0))),
 
@@ -345,7 +357,7 @@ impl<'src, 't> Parser<'src, 't> {
                     };
 
                     // consume annotation
-                    let typ: Type<'_> = if matches!(self.cur(), Some(Token::Colon)) {
+                    let typ: Type<'_> = if self.matches(&Token::Colon) {
                         self.advance();
 
                         // TODO: add support for array and generic types
@@ -380,7 +392,7 @@ impl<'src, 't> Parser<'src, 't> {
 
                     // expected equals to get to right hand of assignment (if none it's a decl)
                     let mut init = None;
-                    if matches!(self.cur(), Some(Token::Assign)) {
+                    if self.matches(&Token::Assign) {
                         self.advance();
                         init = Some(self.parse_expr(0));
                     }
@@ -408,7 +420,11 @@ impl<'src, 't> Parser<'src, 't> {
             }
 
             // TODO: make the compiler warn on unnecessary semicolon
-            while matches!(self.cur(), Some(Token::Semicolon)) {
+            if !(self.matches(&Token::Newline) || self.matches(&Token::Semicolon)) {
+                panic!("all statements must be followed by either a newline or semicolon")
+            }
+
+            while self.matches(&Token::Semicolon) {
                 self.advance();
             }
         }
