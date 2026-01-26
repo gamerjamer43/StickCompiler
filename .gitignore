@@ -6,3 +6,6 @@
 
 # privating my todo again
 TODO
+
+# hiding smoketest (cus this prolly wont be used going forward)
+smoketest.txt

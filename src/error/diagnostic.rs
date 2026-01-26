@@ -1,4 +1,4 @@
-use super::error::SyntaxError;
+use super::SyntaxError;
 use ariadne::{Label, Report, ReportKind, Source};
 use std::{
     fmt::{Display, Formatter, Result},

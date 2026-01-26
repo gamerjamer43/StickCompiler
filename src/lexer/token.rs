@@ -2,12 +2,12 @@ use core::fmt;
 use std::fmt::Display;
 
 // the lexer itself, the big beef (logos specs look a lil ugly so don't count this in any PRs)
-use super::error::{SyntaxError, err};
+use crate::error::{SyntaxError, lex_err};
 use logos::{Logos, skip};
 
 // the entire token spec. this also doubles as the lexer itself when we run Token::lexer()
 #[derive(Logos, Default, Debug, PartialEq)]
-#[logos(error(SyntaxError<'s>, err))] // TODO: fully understand why 's shuts this up, and why i can't use '_ or 'src
+#[logos(error(SyntaxError<'s>, lex_err))] // TODO: fully understand why 's shuts this up, and why i can't use '_ or 'src
 #[logos(skip r"[ \t\n\f\r]+")] // ignore tabs, newlines, form feeds, and carriage returns
 pub enum Token<'src> {
     // comments (skipped)

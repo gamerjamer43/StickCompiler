@@ -1,11 +1,13 @@
 //! docs here soon i'm lazy as fuck
+mod error;
 mod lexer;
 mod parser;
 
 // gotta work on this name but now im tired
 use crate::{
-    lexer::{diagnostic::dump, lex::lex, token::Token},
-    parser::{ast::Stmt, parse::Parser},
+    error::dump,
+    lexer::{lex, Token},
+    parser::{Parser, ast::Stmt},
 };
 
 use std::{

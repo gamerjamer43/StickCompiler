@@ -4,7 +4,8 @@ use core::fmt;
 use std::time::Instant;
 
 use super::ast::*;
-use crate::lexer::{diagnostic::Diagnostic, token::Token};
+use crate::error::{Diagnostic};
+use crate::lexer::{Token};
 
 // didn't tie parser lifetime to source
 pub struct Parser<'src, 't> {
@@ -70,7 +71,7 @@ impl<'src, 't> Parser<'src, 't> {
 
             // indexing/fields r highest precedence
             let precedence: u8 = match tok {
-                Token::LParen | Token::LBracket | Token::Dot => 15,
+                Token::LParen | Token::LBracket | Token::Dot | Token::Arrow => 15,
                 _ => 0,
             };
 

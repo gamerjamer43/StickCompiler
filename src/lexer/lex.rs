@@ -1,7 +1,5 @@
-use super::{
-    diagnostic::{Diagnostic, dump},
-    token::Token,
-};
+use super::{Token};
+use crate::error::{Diagnostic, dump};
 use logos::{Lexer, Logos};
 use std::{ops::Range, result::Result, time::Instant};
 
