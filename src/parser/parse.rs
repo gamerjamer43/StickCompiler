@@ -35,6 +35,7 @@ impl<'src, 't> Parser<'src, 't> {
             self.pos += 1;
             Some(tok)
         } else {
+            // TODO: add proper error handling
             None
         }
     }
@@ -117,7 +118,8 @@ impl<'src, 't> Parser<'src, 't> {
                         };
                     }
 
-                    Token::Dot => {
+                    // TODO: discriminate dot vs arrow
+                    Token::Dot | Token::Arrow => {
                         self.advance();
 
                         // fields r simple just should be one identifier
@@ -319,6 +321,72 @@ impl<'src, 't> Parser<'src, 't> {
                 // idents (read parse_ident)
                 Token::Identifier(_) => nodes.push(Stmt::Expr(self.parse_expr(0))),
 
+                // TODO: see how we can break some of this down
+                Token::Let => {
+                    self.advance();
+
+                    // specifiers are evaluated in this order
+                    let constant = self.expect(|t| matches!(t, Token::Const)).is_some();
+                    let global   = self.expect(|t| matches!(t, Token::Static)).is_some();
+                    let mutable  = self.expect(|t| matches!(t, Token::Mutable)).is_some();
+
+                    // ensure constant isnt used where it can't be
+                    if constant && mutable { panic!("constant cannot be used in tandem with mutable."); }
+                    if constant && global { panic!("constant cannot be used in tandem with static."); }
+
+                    // consume name (TODO: add let _)
+                    let name: Ident<'_> = match self.expect(|t| matches!(t, Token::Identifier(_))) {
+                        Some(Token::Identifier(name)) => Ident(name),
+                        _ => panic!("let must have an identifier afterwards"),
+                    };
+
+                    // consume annotation
+                    let typ: Type<'_> = if matches!(self.cur(), Some(Token::Colon)) {
+                        self.advance();
+
+                        // TODO: add support for array and generic types
+                        match self.expect(|t| matches!(t, Token::Identifier(_) | Token::Unit | Token::Underscore)) {
+                            Some(Token::Identifier(typname)) => match *typname {
+                                "i8" => Type::I8,
+                                "u8" => Type::U8,
+                                "i16" => Type::I16,
+                                "u16" => Type::U16,
+                                "i32" => Type::I32,
+                                "u32" => Type::U32,
+                                "i64" => Type::I64,
+                                "u64" => Type::U64,
+                                "f32" => Type::F32,
+                                "f64" => Type::F64,
+                                "bool" => Type::Bool,
+                                "char" => Type::Char,
+                                "str" => Type::Str,
+                                _ => Type::Ident(Ident(typname)),
+                            },
+
+                            // unit type and inferred have to be handled seperately
+                            Some(Token::Unit) => Type::Unit,
+                            Some(Token::Underscore) => Type::Inferred,
+
+                            _ => panic!("expected type name after ':'"),
+                        }
+                    }
+
+                    // (if no annotation the type is inferred by the compiler) 
+                    else { Type::Inferred };
+
+                    // expected equals to get to right hand of assignment (if none it's a decl)
+                    let mut init = None;
+                    if matches!(self.cur(), Some(Token::Assign)) {
+                        self.advance();
+                        init = Some(self.parse_expr(0));
+                    }
+
+                    // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
+                    if typ == Type::Inferred && init.is_none() { panic!("type cannot be inferred without a right hand side")}
+
+                    nodes.push(Stmt::VarDecl { name, typ, init, mutable, constant, global })
+                }
+
                 // control flow: this dont seem right but...
                 // Token::Break => nodes.push(Stmt::Break),
                 // Token::Continue => nodes.push(Stmt::Continue),
@@ -332,11 +400,10 @@ impl<'src, 't> Parser<'src, 't> {
             }
 
             if debug {
-                println!("Parsed: \n{:#?}", nodes.last().unwrap());
+                println!("Parsed: \n{:#?}\n", nodes.last().unwrap());
             }
 
             // TODO: make the compiler warn on unnecessary semicolon
-            self.advance();
             while matches!(self.cur(), Some(Token::Semicolon)) {
                 self.advance();
             }

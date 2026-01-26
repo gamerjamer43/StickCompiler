@@ -54,8 +54,12 @@ pub enum Type<'src> {
 
     // void/unit
     Unit,
+
     // string type (NOT THE LITERAL)
     Str,
+
+    // user defined types (local to scope)
+    Ident(Ident<'src>),
 
     /// `lib`, `std::io::File`, maybe others
     Path(Vec<Ident<'src>>),
@@ -87,6 +91,9 @@ pub enum Type<'src> {
     //     mutable: bool,
     //     inner: Box<Type<'src>>,
     // },
+
+    // type unlisted, or specifically marked as inferred
+    Inferred,
 }
 
 /// a small list of everything that can be on the left hand side of an assignment
@@ -326,11 +333,15 @@ pub enum Stmt<'src> {
     // variable declaration is a statement rather than an expression
     VarDecl {
         name: Ident<'src>,
-        typ: Option<Type<'src>>,
+        typ: Type<'src>,
         init: Option<Expr<'src>>,
 
         // may drop this, but adding immutability for like tuples
         // forces a reassignment to change so may keep this as it has its purpose
         mutable: bool,
+        constant: bool,
+
+        // global == static
+        global: bool,
     },
 }

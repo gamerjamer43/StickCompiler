@@ -95,6 +95,15 @@ pub enum Token<'src> {
     #[token("true", |_| true)]
     Bool(bool),
 
+    // unit type (i do not wanna steal sm from rust i'm just trying to make this approachable)
+    #[token("()")]       Unit,
+
+    // anything compiler inferred or discarded marked with _
+    #[token("_")]        Underscore, 
+
+    // used for variable declarations
+    #[token("let")]      Let,
+
     // fine ig i'll do control keywords in here too
     #[token("if")]       If,
     #[token("else")]     Else,
@@ -107,11 +116,13 @@ pub enum Token<'src> {
     #[token("break")]    Break,
     #[token("continue")] Continue,
     #[token("match")]    Match,
+    
+    // module system
     #[token("import")]   Import,
     #[token("from")]     From,
 
-
     // type qualifiers/storage specifiers
+    #[token("mutable")]  Mutable,
     #[token("const")]    Const,
     #[token("static")]   Static,
     #[token("public")]   Public,
@@ -126,7 +137,7 @@ pub enum Token<'src> {
     // Lifetime(&'src str),
 
     /// identifiers cannot start with a number, and can only contain A-Z, a-z, 0-9, and _
-    #[regex("[A-Za-z_][A-Za-z0-9_]*", |lex| lex.slice())]
+    #[regex("(?:[A-Za-z][A-Za-z0-9_]*|_[A-Za-z0-9_]+)", |lex| lex.slice())]
     Identifier(&'src str),
 
     /// strings are anything enclosed inside "", no closure == borrow slices of the string at parse time, avoids heap allocating a copy

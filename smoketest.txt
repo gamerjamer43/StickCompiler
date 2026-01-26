@@ -33,7 +33,7 @@ acc += 1; acc -= 2; acc *= 3; acc /= 4; acc %= 5;
 mask &= 255; mask |= 1; mask ^= 2; sh <<= 1; sh >>= 1;
 
 // field accesses (-> may not get used, or may not be used for that)
-// p = part1->field;
+p = part1->field;
 q = part2.field;
 
 // call a function
