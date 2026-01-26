@@ -141,6 +141,7 @@ pub enum BinOp {
     Mul,
     Div,
     Mod,
+    Power,
 
     // equality operations
     Eq,

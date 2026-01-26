@@ -241,6 +241,9 @@ impl<'src, 't> Parser<'src, 't> {
                     _ => unreachable!("what the helliante"),
                 },
 
+                // E
+                Token::StarStar => (11, InfixKind::Binary(BinOp::Power)),
+
                 // erm
                 _ => break,
             };
@@ -383,7 +386,7 @@ impl<'src, 't> Parser<'src, 't> {
                     }
 
                     // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
-                    if typ == Type::Inferred && init.is_none() { panic!("type cannot be inferred without a right hand side")}
+                    if typ == Type::Inferred && init.is_none() { panic!("type cannot be inferred without a right hand side") }
 
                     nodes.push(Stmt::VarDecl { name, typ, init, mutable, constant, global })
                 }
