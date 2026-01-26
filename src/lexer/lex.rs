@@ -3,6 +3,12 @@ use crate::error::{Diagnostic, dump};
 use logos::{Lexer, Logos};
 use std::{ops::Range, result::Result, time::Instant};
 
+// so i can lex both tokens and spans
+pub struct Lexed<'src> {
+    pub tokens: Vec<Token<'src>>,
+    pub spans: Vec<Range<usize>>,
+}
+
 // would like guidance as to if i'm doing this cleanly or if i'm nesting too much
 // i like the if let syntax frm ocaml carrying over. v heavy emphasis on pattern matching
 // src is a horrible name its just the source file
@@ -11,9 +17,10 @@ pub fn lex<'path, 'src>(
     src: &'src str,
     debug: bool,
     fastfail: bool,
-) -> Result<Vec<Token<'src>>, Vec<Diagnostic<'path, 'src>>> {
+) -> Result<Lexed<'src>, Vec<Diagnostic<'path, 'src>>> {
     let mut errors: Vec<Diagnostic<'path, 'src>> = Vec::new();
     let mut tokens: Vec<Token<'src>> = Vec::new();
+    let mut spans: Vec<Range<usize>> = Vec::new();
     let start: Instant = Instant::now();
 
     let linecount: usize = src.lines().count();
@@ -25,6 +32,7 @@ pub fn lex<'path, 'src>(
                 if debug && tok != Token::Newline {
                     println!("[bytes {:?}]: {tok} ", lex.span());
                 }
+                spans.push(lex.span());
                 tokens.push(tok)
             }
 
@@ -63,7 +71,7 @@ pub fn lex<'path, 'src>(
 
     // any errors stop at the lexing stage
     if errors.is_empty() {
-        Ok(tokens)
+        Ok(Lexed { tokens, spans })
     } else {
         Err(errors)
     }

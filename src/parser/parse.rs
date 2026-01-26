@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_variables)]
 
 use core::fmt;
-use std::time::Instant;
+use std::{time::Instant, ops::Range, process::exit,};
 
 use super::ast::*;
-use crate::error::{Diagnostic};
+use crate::error::{Diagnostic, SyntaxError, ParseError};
 use crate::lexer::{Token};
 
 // didn't tie parser lifetime to source
@@ -12,7 +12,9 @@ pub struct Parser<'src, 't> {
     pub path: &'src str,
     pub src: &'src str,
     pub tokens: &'t [Token<'src>],
+    pub spans: &'t [Range<usize>],
     pub pos: usize,
+    pub fastfail: bool,
 }
 
 impl<'src, 't> Parser<'src, 't> {
@@ -30,6 +32,25 @@ impl<'src, 't> Parser<'src, 't> {
     fn matches(&self, matched: &Token<'src>) -> bool {
         let tok: &Token<'_> = self.cur().unwrap_or(&Token::Error);
         tok == matched
+    }
+
+    #[inline]
+    fn error(&self, err: SyntaxError<'src>) -> Diagnostic<'t, 'src> {
+        let diag: Diagnostic<'_, '_> = Diagnostic { 
+            path: self.path, 
+            src: self.src, 
+            
+            // small copy whatever
+            span: self.spans[self.pos].clone(), 
+            err
+        };
+
+        if self.fastfail {
+            println!("{diag}");
+            exit(0);
+        }
+
+        diag
     }
 
     #[inline]
@@ -103,7 +124,9 @@ impl<'src, 't> Parser<'src, 't> {
                             }
 
                             // malformed calls
-                            if !self.matches(&Token::RParen){ panic!("expected ',' or ')' in call. still have yet to add an error system"); }
+                            if !self.matches(&Token::RParen){ 
+                                panic!("expected ',' or ')' in call. still have yet to add an error system");
+                            }
                         }
 
                         // expect r paren
@@ -321,9 +344,15 @@ impl<'src, 't> Parser<'src, 't> {
         }
     }
 
-    pub fn parse(&mut self, debug: bool) -> Result<Vec<Stmt<'src>>, Vec<Diagnostic<'t, 'src>>> {
+    pub fn parse(&mut self, flags: &[bool]) -> Result<Vec<Stmt<'src>>, Vec<Diagnostic<'t, 'src>>> {
         let mut nodes: Vec<Stmt<'src>> = Vec::new();
+        let mut errors: Vec<Diagnostic<'t, 'src>> = Vec::new();
         let start: Instant = Instant::now();
+
+        // resolve flags
+        let debug: bool = flags[0];
+        let fastfail: bool = flags[1];
+        self.fastfail = fastfail;
         if debug { println!(); }
 
         while let Some(cur) = self.cur() {
@@ -353,7 +382,10 @@ impl<'src, 't> Parser<'src, 't> {
                     // consume name (TODO: add let _)
                     let name: Ident<'_> = match self.expect(|t| matches!(t, Token::Identifier(_))) {
                         Some(Token::Identifier(name)) => Ident(name),
-                        _ => panic!("let must have an identifier afterwards"),
+                        _ => {
+                            self.error(SyntaxError::Parse(ParseError::MissingExpected("let must have an identifier afterwards")));
+                            continue;
+                        }
                     };
 
                     // consume annotation
@@ -383,7 +415,13 @@ impl<'src, 't> Parser<'src, 't> {
                             Some(Token::Unit) => Type::Unit,
                             Some(Token::Underscore) => Type::Inferred,
 
-                            _ => panic!("expected type name after ':'"),
+                            // push missing type after :
+                            _ => {
+                                errors.push(
+                                    self.error(SyntaxError::Parse(ParseError::MissingExpected("expected type name after ':'")))
+                                );
+                                continue;
+                            },
                         }
                     }
 
@@ -394,11 +432,17 @@ impl<'src, 't> Parser<'src, 't> {
                     let mut init = None;
                     if self.matches(&Token::Assign) {
                         self.advance();
+
+                        // TODO: error if no right hand side or newline before
                         init = Some(self.parse_expr(0));
                     }
 
                     // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
-                    if typ == Type::Inferred && init.is_none() { panic!("type cannot be inferred without a right hand side") }
+                    
+                    if typ == Type::Inferred && init.is_none() { 
+                        self.error(SyntaxError::Parse(ParseError::MissingExpected("type cannot be inferred without a right hand side")));
+                        continue;
+                    }
 
                     nodes.push(Stmt::VarDecl { name, typ, init, mutable, constant, global })
                 }
@@ -421,7 +465,8 @@ impl<'src, 't> Parser<'src, 't> {
 
             // TODO: make the compiler warn on unnecessary semicolon
             if !(self.matches(&Token::Newline) || self.matches(&Token::Semicolon)) {
-                panic!("all statements must be followed by either a newline or semicolon")
+                self.error(SyntaxError::Parse(ParseError::MissingExpected("all statements must be followed by either a newline or semicolon")));
+                continue;
             }
 
             while self.matches(&Token::Semicolon) {
@@ -435,7 +480,14 @@ impl<'src, 't> Parser<'src, 't> {
             nodes.len(),
             start.elapsed().as_secs_f64()
         );
-        Ok(nodes)
+
+        if errors.is_empty() {
+            Ok(nodes)
+        }
+
+        else {
+            Err(errors)
+        }
     }
 }
 

@@ -32,6 +32,14 @@ let static mutable staticMut: i32 = 5
 // NO TYPE:
 // let [const/static/mutable] inferred
 //
+// COLON BUT NO TYPE FOLLOWING instead
+// let testing:
+// let testing: = value
+//
+// EQUALS WITH NO RHS
+// let testing =
+// let testing: i32 =
+//
 // DISALLOWED PAIRINGS
 // let const mutable failure = 5
 // let const static failure2 = 6

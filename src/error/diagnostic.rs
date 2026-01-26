@@ -1,5 +1,8 @@
-use super::SyntaxError;
-use ariadne::{Label, Report, ReportKind, Source};
+use super::{SyntaxError, ParseError};
+use ariadne::{
+    Report, ReportKind, Source,
+    Label, Color
+};
 use std::{
     fmt::{Display, Formatter, Result},
     fs::File,
@@ -23,20 +26,59 @@ pub struct Diagnostic<'a, 'src> {
     pub err: SyntaxError<'src>,
 }
 
+// hacky way to avoid defining names for every type
+impl<'src> SyntaxError<'src> {
+    pub fn name(&self) -> &str {
+        match self {
+            SyntaxError::Lex(e) => e.as_ref(),
+            SyntaxError::Parse(e) => e.as_ref(),
+            SyntaxError::Unknown => "Unknown",
+        }
+    }
+
+    pub fn help(&self) -> &str {
+        match self {
+            SyntaxError::Lex(_) => "lexer errors are only caused by things that would cause issues in tokenization.",
+            SyntaxError::Parse(e) => match e {
+                ParseError::MissingExpected(msg) => {
+                    if msg.starts_with("expected type name") {
+                        "either omit the colon, or specify a type (if it's a decl without a right hand side, you MUST specify type)"
+                    }
+
+                    else if msg.starts_with("let must have") {
+                        "if you want to discard the value, use _, otherwise attach a name"
+                    }
+
+                    else if msg.starts_with("type cannot be") {
+                        "either declare the type beforehand, or add a right hand side and let the compiler infer it."
+                    }
+
+                    else if msg.starts_with("all statements must") {
+                        "either stick them on seperate lines, or seperate them using a semicolon (bad practice, SHAME!)"
+                    }
+
+                    else { "Unknown" }
+                }
+            },
+            SyntaxError::Unknown => "Only god can save you (or reading the docs lmao.)",
+        }
+    }
+}
+    
+
 // so much fucking cleaner saves me a lot of pain
 impl<'a, 'src> Display for Diagnostic<'a, 'src> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let mut buf: Vec<u8> = Vec::new();
 
         // main report with a short, human-friendly header
-        Report::build(ReportKind::Error, self.path, self.span.start)
-            .with_message(format!("lex error: {}", self.err))
+        let name: &str = self.err.name();
+        Report::build(ReportKind::Custom(name, Color::Red), self.path, self.span.start)
+            .with_message(&self.err)
             // points to what's fucked up
             .with_label(Label::new((self.path, self.span.clone())).with_message("error here"))
             // lexer help (doing different display in the parser, as i will need notes)
-            .with_help(
-                "lexer errors are only caused by things that would cause issues in tokenization.",
-            ) // short hint
+            .with_help(self.err.help()) // short hint
             .finish()
             .write((self.path, Source::from(self.src)), &mut buf)
             .unwrap();

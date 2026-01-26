@@ -1,3 +1,5 @@
+use strum_macros::AsRefStr;
+
 use std::fmt::{Display, Formatter, Result};
 
 use crate::lexer::Token;
@@ -23,7 +25,7 @@ macro_rules! usage {
 }
 
 /// a generic error for anything that may happen during lexing.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, AsRefStr)]
 pub enum LexError<'src> {
     UnterminatedString(&'src str),
     UnterminatedChar(&'src str),
@@ -31,13 +33,13 @@ pub enum LexError<'src> {
 }
 
 /// a generic error for anything that may happen during parsing.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, AsRefStr)]
 pub enum ParseError<'src> {
-    Temp(&'src str),
+    MissingExpected(&'src str),
 }
 
 /// unified place to hold any error that may happen during compile time
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default, AsRefStr)]
 pub enum SyntaxError<'src> {
     Lex(LexError<'src>),
     Parse(ParseError<'src>),
@@ -55,11 +57,11 @@ impl Display for SyntaxError<'_> {
                 use LexError::*;
                 match le {
                     UnterminatedString(s) => write!(
-                        f, "\x1b[1mUnterminatedString:\x1b[22m Strings must be properly terminated. Afflicted: {s}"
+                        f, "\x1b[1mUnterminatedString:\x1b[22m Strings must be properly terminated, {s} is missing termination"
                     ),
 
                     UnterminatedChar(s) => write!(
-                        f, "\x1b[1mUnterminatedChar:\x1b[22m Chars must be properly terminated. Afflicted: {s}"
+                        f, "\x1b[1mUnterminatedChar:\x1b[22m Chars must be properly terminated, {s} is missing termination"
                     ),
 
                     UnknownToken(s) => write!(
@@ -72,7 +74,7 @@ impl Display for SyntaxError<'_> {
             SyntaxError::Parse(pe) => {
                 use ParseError::*;
                 match pe {
-                    Temp(s) => write!(f, "shut up compiler: {s}"),
+                    &MissingExpected(s) => write!(f, "missing a value where expected, {s}"),
                 }
             }
 

@@ -5,8 +5,8 @@ mod parser;
 
 // gotta work on this name but now im tired
 use crate::{
-    error::dump,
-    lexer::{lex, Token},
+    error::{dump, Diagnostic},
+    lexer::{lex},
     parser::{Parser, ast::Stmt},
 };
 
@@ -16,6 +16,20 @@ use std::{
     iter::Skip,
     process::exit,
 };
+
+fn log_errors(errors: &Vec<Diagnostic<'_, '_>>, flags: Vec<bool>) {
+    for d in errors {
+        eprintln!("{d}");
+    }
+
+    // debug flag
+    if flags[0] {
+        dump(errors, "lastrun.log")
+            .unwrap_or_else(|_| eprintln!("Failed to dump errors."));
+    }
+
+    println!("\n(!) {} errors found.", errors.len());
+}
 
 fn main() {
     // handle cl args
@@ -55,22 +69,10 @@ fn main() {
     });
 
     // TODO: parse the returned tokens into an AST
-    let tokens: Vec<Token<'_>> = match lex(&path, &src, flags[0], flags[1]) {
-        Ok(tokens) => tokens,
-
-        // any errors
+    let lexed = match lex(&path, &src, flags[0], flags[1]) {
+        Ok(lexed) => lexed,
         Err(errors) => {
-            for d in &errors {
-                eprintln!("{d}");
-            }
-
-            // debug flag
-            if flags[0] {
-                dump(&errors, "lastrun.log")
-                    .unwrap_or_else(|_| eprintln!("Failed to dump errors."));
-            }
-
-            println!("\n(!) {} errors found.", errors.len());
+            log_errors(&errors, flags);
             exit(0);
         }
     };
@@ -79,13 +81,18 @@ fn main() {
     let mut parser = Parser {
         path: &path,
         src: &src,
-        tokens: &tokens,
+        tokens: &lexed.tokens,
+        spans: &lexed.spans,
         pos: 0,
+        fastfail: flags[1],
     };
 
-    let _ast: Vec<Stmt<'_>> = match parser.parse(flags[0]) {
+    let _ast: Vec<Stmt<'_>> = match parser.parse(&flags) {
         Ok(ok) => ok,
-        Err(_err) => exit(0),
+        Err(errors) => {
+            log_errors(&errors, flags);
+            exit(0);
+        }
     };
 
     if flags[0] { press_btn_continue::wait("Press any button to continue to semantic analysis and the opt layer. (not done yet)").unwrap(); }
