@@ -433,8 +433,18 @@ impl<'src, 't> Parser<'src, 't> {
                     if self.matches(&Token::Assign) {
                         self.advance();
 
-                        // TODO: error if no right hand side or newline before
-                        init = Some(self.parse_expr(0));
+                        match self.cur().unwrap_or(&Token::Error) {
+                            Token::Error | Token::Newline | Token::Semicolon => {
+                                errors.push(self.error(SyntaxError::Parse(
+                                    ParseError::MissingExpected("expected expression after '='")
+                                )));
+                                continue;
+                            },
+
+                            _ => {
+                                init = Some(self.parse_expr(0));
+                            }
+                        }
                     }
 
                     // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)

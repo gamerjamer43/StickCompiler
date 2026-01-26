@@ -41,7 +41,7 @@ impl<'src> SyntaxError<'src> {
             SyntaxError::Lex(_) => "lexer errors are only caused by things that would cause issues in tokenization.",
             SyntaxError::Parse(e) => match e {
                 ParseError::MissingExpected(msg) => {
-                    if msg.starts_with("expected type name") {
+                    if msg.starts_with("expected type") {
                         "either omit the colon, or specify a type (if it's a decl without a right hand side, you MUST specify type)"
                     }
 
@@ -55,6 +55,10 @@ impl<'src> SyntaxError<'src> {
 
                     else if msg.starts_with("all statements must") {
                         "either stick them on seperate lines, or seperate them using a semicolon (bad practice, SHAME!)"
+                    }
+
+                    else if msg.starts_with("expected expression") {
+                        "the right hand of an equals sign cannot be blank"
                     }
 
                     else { "Unknown" }

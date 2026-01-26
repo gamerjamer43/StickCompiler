@@ -38,7 +38,7 @@ let static mutable staticMut: i32 = 5
 //
 // EQUALS WITH NO RHS
 // let testing =
-// let testing: i32 =
+let testing: i32 =
 //
 // DISALLOWED PAIRINGS
 // let const mutable failure = 5
