@@ -78,7 +78,7 @@ pub enum Type<'src> {
         params: Vec<Type<'src>>,
         ret: Box<Type<'src>>,
     },
-    
+
     // if i add a borrow system
     // `&T` / `&mut T`
     // Ref {
@@ -234,11 +234,10 @@ pub enum Expr<'src> {
     Field {
         obj: Box<Expr<'src>>,
         name: Ident<'src>,
-
         // TODO: figure out ->
         // whether this access is a pointer or not
         // ptr: bool,
-        
+
         // whether the compiler should automatically deref this value or not (not implemented yet so always false)
         // deref: bool,
     },
@@ -246,9 +245,9 @@ pub enum Expr<'src> {
     // method calls (a.b(); a.b().c(); a().b() and etc.)
     Method {
         // receiver isnt always just an obj, it can be a chained call
-        receiver: Box<Expr<'src>>, 
+        receiver: Box<Expr<'src>>,
         method: Ident<'src>,
-        args: Vec<Expr<'src>> 
+        args: Vec<Expr<'src>>,
     },
 
     // index or slice (a[b] or a[b..c])
@@ -260,8 +259,8 @@ pub enum Expr<'src> {
     // control flow
     If {
         cond: Box<Expr<'src>>,
-        then: Box<Expr<'src>>,
-        else_: Option<Box<Expr<'src>>>,
+        then: Vec<Stmt<'src>>,
+        else_: Option<Vec<Stmt<'src>>>,
     },
 
     While {
@@ -280,8 +279,6 @@ pub enum Expr<'src> {
         iter: Box<Expr<'src>>,
         body: Box<Stmt<'src>>,
     },
-
-    Block(Vec<Stmt<'src>>),
 
     Unknown,
 }

@@ -1,11 +1,11 @@
 #![allow(dead_code, unused_variables)]
 
 use core::fmt;
-use std::{time::Instant, ops::Range, process::exit,};
+use std::{ops::Range, process::exit, time::Instant};
 
 use super::ast::*;
-use crate::error::{Diagnostic, SyntaxError, ParseError};
-use crate::lexer::{Token};
+use crate::error::{Diagnostic, ParseError, SyntaxError};
+use crate::lexer::Token;
 
 // didn't tie parser lifetime to source
 pub struct Parser<'src, 't> {
@@ -35,14 +35,14 @@ impl<'src, 't> Parser<'src, 't> {
     }
 
     #[inline]
-    fn error(&self, err: SyntaxError<'src>) -> Diagnostic<'t, 'src> {
-        let diag: Diagnostic<'_, '_> = Diagnostic { 
-            path: self.path, 
-            src: self.src, 
-            
+    fn error(&self, errors: &mut Vec<Diagnostic<'t, 'src>>, err: SyntaxError<'src>) {
+        let diag: Diagnostic<'_, '_> = Diagnostic {
+            path: self.path,
+            src: self.src,
+
             // small copy whatever
-            span: self.spans[self.pos].clone(), 
-            err
+            span: self.spans[self.pos].clone(),
+            err,
         };
 
         if self.fastfail {
@@ -50,7 +50,7 @@ impl<'src, 't> Parser<'src, 't> {
             exit(0);
         }
 
-        diag
+        errors.push(diag);
     }
 
     #[inline]
@@ -69,7 +69,10 @@ impl<'src, 't> Parser<'src, 't> {
     }
 
     // leaving some shit intentionally _ because i'll do lifetimes later
-    #[inline] fn advance(&mut self) -> Option<&Token<'src>> { self.advance_by(1) }
+    #[inline]
+    fn advance(&mut self) -> Option<&Token<'src>> {
+        self.advance_by(1)
+    }
 
     #[inline]
     fn advance_by(&mut self, n: u8) -> Option<&Token<'src>> {
@@ -93,7 +96,7 @@ impl<'src, 't> Parser<'src, 't> {
                 None => {
                     println!("not implemented: {tok:?}");
                     return Expr::Unknown;
-                },
+                }
             };
 
             // indexing/fields r highest precedence
@@ -117,20 +120,25 @@ impl<'src, 't> Parser<'src, 't> {
                             // match commas (and ending parenthesis)
                             while self.matches(&Token::Comma) {
                                 self.advance();
-                                if self.matches(&Token::RParen) { break; }
+                                if self.matches(&Token::RParen) {
+                                    break;
+                                }
 
                                 // evaluate THEN push
                                 args.push(self.parse_expr(0));
                             }
 
                             // malformed calls
-                            if !self.matches(&Token::RParen){ 
-                                panic!("expected ',' or ')' in call. still have yet to add an error system");
+                            if !self.matches(&Token::RParen) {
+                                panic!(
+                                    "expected ',' or ')' in call. have to add this to the error system"
+                                );
                             }
                         }
 
                         // expect r paren
-                        self.expect(|t: &Token<'_>| matches!(t, Token::RParen)).expect("missing ')'");
+                        self.expect(|t: &Token<'_>| matches!(t, Token::RParen))
+                            .expect("missing ')'");
 
                         // method calls exist, so there's a match here
                         left = match left {
@@ -158,11 +166,14 @@ impl<'src, 't> Parser<'src, 't> {
                             _ => {
                                 println!("not implemented: {tok:?}");
                                 return Expr::Unknown;
-                            },
+                            }
                         };
 
                         let lvalue: Box<Expr<'_>> = Box::new(left);
-                        left = Expr::Field { obj: lvalue, name: Ident(name) };
+                        left = Expr::Field {
+                            obj: lvalue,
+                            name: Ident(name),
+                        };
                     }
 
                     // slices/index
@@ -176,31 +187,39 @@ impl<'src, 't> Parser<'src, 't> {
                             // match the end bracket or error
                             let end: Option<Box<Expr<'_>>> = if !self.matches(&Token::RBracket) {
                                 Some(Box::new(self.parse_expr(0)))
-                            } else { None };
+                            } else {
+                                None
+                            };
 
                             Subscript::Range { start: None, end }
-                        }
-
-                        else {
+                        } else {
                             // otherwise try and evaluate out whatever is inside, start then end
                             let start: Expr<'_> = self.parse_expr(0);
                             if self.matches(&Token::DotDot) {
                                 self.advance();
 
                                 // if nothing matches its [i..]
-                                let end: Option<Box<Expr<'_>>> = if !self.matches(&Token::RBracket) {
+                                let end: Option<Box<Expr<'_>>> = if !self.matches(&Token::RBracket)
+                                {
                                     Some(Box::new(self.parse_expr(0)))
-                                } else { None };
+                                } else {
+                                    None
+                                };
 
-                                Subscript::Range { start: Some(Box::new(start)), end }
+                                Subscript::Range {
+                                    start: Some(Box::new(start)),
+                                    end,
+                                }
                             }
-
                             // NOW we know it's an index
-                            else { Subscript::Index(Box::new(start)) }
+                            else {
+                                Subscript::Index(Box::new(start))
+                            }
                         };
 
                         // expect an ending bracket
-                        self.expect(|t: &Token<'_>| matches!(t, Token::RBracket)).expect("missing ']'");
+                        self.expect(|t: &Token<'_>| matches!(t, Token::RBracket))
+                            .expect("missing ']'");
 
                         let lvalue: Box<Expr<'_>> = Box::new(left);
                         left = Expr::Index { obj: lvalue, sub };
@@ -216,37 +235,37 @@ impl<'src, 't> Parser<'src, 't> {
             // normal ops
             let (op_prec, op) = match tok {
                 // assignment always last trump
-                Token::PlusEq    => (0, InfixKind::Assign(AssignOp::PlusEq)),
-                Token::MinusEq   => (0, InfixKind::Assign(AssignOp::MinusEq)),
-                Token::StarEq    => (0, InfixKind::Assign(AssignOp::StarEq)),
-                Token::SlashEq   => (0, InfixKind::Assign(AssignOp::SlashEq)),
+                Token::PlusEq => (0, InfixKind::Assign(AssignOp::PlusEq)),
+                Token::MinusEq => (0, InfixKind::Assign(AssignOp::MinusEq)),
+                Token::StarEq => (0, InfixKind::Assign(AssignOp::StarEq)),
+                Token::SlashEq => (0, InfixKind::Assign(AssignOp::SlashEq)),
                 Token::PercentEq => (0, InfixKind::Assign(AssignOp::PercentEq)),
-                Token::AndEq     => (0, InfixKind::Assign(AssignOp::AndEq)),
-                Token::OrEq      => (0, InfixKind::Assign(AssignOp::OrEq)),
-                Token::XorEq     => (0, InfixKind::Assign(AssignOp::XorEq)),
-                Token::ShlEq     => (0, InfixKind::Assign(AssignOp::ShlEq)),
-                Token::ShrEq     => (0, InfixKind::Assign(AssignOp::ShrEq)),
+                Token::AndEq => (0, InfixKind::Assign(AssignOp::AndEq)),
+                Token::OrEq => (0, InfixKind::Assign(AssignOp::OrEq)),
+                Token::XorEq => (0, InfixKind::Assign(AssignOp::XorEq)),
+                Token::ShlEq => (0, InfixKind::Assign(AssignOp::ShlEq)),
+                Token::ShrEq => (0, InfixKind::Assign(AssignOp::ShrEq)),
 
                 // logical/bitwise
-                Token::LogicalOr   => (1, InfixKind::Binary(BinOp::Or)),
-                Token::LogicalAnd  => (2, InfixKind::Binary(BinOp::And)),
-                Token::BitOr       => (3, InfixKind::Binary(BinOp::BitOr)),
-                Token::BitXor      => (4, InfixKind::Binary(BinOp::BitXor)),
-                Token::BitAnd      => (5, InfixKind::Binary(BinOp::BitAnd)),
-                Token::EqEq        => (6, InfixKind::Binary(BinOp::Eq)),
-                Token::NotEq       => (6, InfixKind::Binary(BinOp::NotEq)),
+                Token::LogicalOr => (1, InfixKind::Binary(BinOp::Or)),
+                Token::LogicalAnd => (2, InfixKind::Binary(BinOp::And)),
+                Token::BitOr => (3, InfixKind::Binary(BinOp::BitOr)),
+                Token::BitXor => (4, InfixKind::Binary(BinOp::BitXor)),
+                Token::BitAnd => (5, InfixKind::Binary(BinOp::BitAnd)),
+                Token::EqEq => (6, InfixKind::Binary(BinOp::Eq)),
+                Token::NotEq => (6, InfixKind::Binary(BinOp::NotEq)),
 
                 // comparators
                 Token::Less | Token::LessEq | Token::Greater | Token::GreaterEq => match tok {
-                    Token::Less      => (7, InfixKind::Binary(BinOp::Less)),
-                    Token::LessEq    => (7, InfixKind::Binary(BinOp::LessEq)),
-                    Token::Greater   => (7, InfixKind::Binary(BinOp::Greater)),
+                    Token::Less => (7, InfixKind::Binary(BinOp::Less)),
+                    Token::LessEq => (7, InfixKind::Binary(BinOp::LessEq)),
+                    Token::Greater => (7, InfixKind::Binary(BinOp::Greater)),
                     Token::GreaterEq => (7, InfixKind::Binary(BinOp::GreaterEq)),
                     _ => unreachable!("what"),
                 },
 
                 // then comes assign its first match
-                Token::Assign    => (0, InfixKind::Assign(AssignOp::Assign)),
+                Token::Assign => (0, InfixKind::Assign(AssignOp::Assign)),
 
                 // bit shifts
                 Token::Shl | Token::Shr => match tok {
@@ -257,15 +276,15 @@ impl<'src, 't> Parser<'src, 't> {
 
                 // AS
                 Token::Plus | Token::Minus => match tok {
-                    Token::Plus  => (9, InfixKind::Binary(BinOp::Add)),
+                    Token::Plus => (9, InfixKind::Binary(BinOp::Add)),
                     Token::Minus => (9, InfixKind::Binary(BinOp::Sub)),
                     _ => unreachable!("what the helly"),
                 },
 
                 // MD (m = mult AND modulo)
                 Token::Star | Token::Slash | Token::Percent => match tok {
-                    Token::Star    => (10, InfixKind::Binary(BinOp::Mul)),
-                    Token::Slash   => (10, InfixKind::Binary(BinOp::Div)),
+                    Token::Star => (10, InfixKind::Binary(BinOp::Mul)),
+                    Token::Slash => (10, InfixKind::Binary(BinOp::Div)),
                     Token::Percent => (10, InfixKind::Binary(BinOp::Mod)),
                     _ => unreachable!("what the helliante"),
                 },
@@ -278,7 +297,9 @@ impl<'src, 't> Parser<'src, 't> {
             };
 
             // let higher precedence ops finish first
-            if op_prec < min { break; }
+            if op_prec < min {
+                break;
+            }
             self.advance();
 
             match op {
@@ -296,12 +317,20 @@ impl<'src, 't> Parser<'src, 't> {
                         }
                     };
 
-                    left = Expr::Assign { op: aop, lhs, rhs: Box::new(rhs) };
+                    left = Expr::Assign {
+                        op: aop,
+                        lhs,
+                        rhs: Box::new(rhs),
+                    };
                 }
 
                 InfixKind::Binary(bop) => {
                     let rhs: Expr<'_> = self.parse_expr(op_prec + 1);
-                    left = Expr::Binary { op: bop, lhs: Box::new(left), rhs: Box::new(rhs) };
+                    left = Expr::Binary {
+                        op: bop,
+                        lhs: Box::new(left),
+                        rhs: Box::new(rhs),
+                    };
                 }
             }
         }
@@ -314,28 +343,46 @@ impl<'src, 't> Parser<'src, 't> {
         // TODO: write proper error handling... and parse expr... and test this
         let tok: &Token<'_> = self.advance().expect("unexpected EOF");
         match tok {
-            Token::Minus       => Expr::Unary { op: UnaryOp::Neg, expr: Box::new(self.parse_expr(12)) },
-            Token::LogicalNot  => Expr::Unary { op: UnaryOp::Not, expr: Box::new(self.parse_expr(12)) },
-            Token::BitNot      => Expr::Unary { op: UnaryOp::BitNot, expr: Box::new(self.parse_expr(12)) },
+            Token::Minus => Expr::Unary {
+                op: UnaryOp::Neg,
+                expr: Box::new(self.parse_expr(12)),
+            },
+            Token::LogicalNot => Expr::Unary {
+                op: UnaryOp::Not,
+                expr: Box::new(self.parse_expr(12)),
+            },
+            Token::BitNot => Expr::Unary {
+                op: UnaryOp::BitNot,
+                expr: Box::new(self.parse_expr(12)),
+            },
 
             Token::LParen => {
                 let inner = self.parse_expr(0);
-                self.expect(|t: &Token<'_>| matches!(t, Token::RParen)).expect("missing ')'");
+                self.expect(|t: &Token<'_>| matches!(t, Token::RParen))
+                    .expect("missing ')'");
                 inner
             }
-        
+
             Token::Identifier(name) => Expr::Ident(Ident(name)),
-            Token::LitInteger(n)    => Expr::Literal(Literal::Int(n)),
-            Token::LitFloat(n)      => Expr::Literal(Literal::Float(n)),
-            Token::LitString(s)     => Expr::Literal(Literal::String(s)),
-            Token::LitChar(c)       => Expr::Literal(Literal::Char(c)),
-            Token::Bool(b)          => Expr::Literal(Literal::Bool(*b)),
-        
-            // Token::If => self.parse_if_expr(),
+            Token::LitInteger(n) => Expr::Literal(Literal::Int(n)),
+            Token::LitFloat(n) => Expr::Literal(Literal::Float(n)),
+            Token::LitString(s) => Expr::Literal(Literal::String(s)),
+            Token::LitChar(c) => Expr::Literal(Literal::Char(c)),
+            Token::Bool(b) => Expr::Literal(Literal::Bool(*b)),
+
+            Token::If => {
+                // self.advance();
+                // self.expect(|t: &Token<'_>| matches!(t, Token::LParen)).expect("missing '(' before start of condition");
+                // let cond: Expr<'_> = self.parse_expr(0);
+                // self.expect(|t: &Token<'_>| matches!(t, Token::RParen)).expect("missing ')'");
+                // Expr::If { cond: Box::new(cond), then: (), else_: () }
+                todo!("impl if statement")
+            }
+
             // Token::While => self.parse_while_expr(),
             // Token::Match => self.parse_match_expr(),
             // Token::LBrace => self.parse_block_expr(),
-        
+
             // temporary solution for nimpl, i need to link ariadne
             _ => {
                 // add this back w a debug flag idk if debug { println!("not implemented: {tok:?}"); }
@@ -353,15 +400,17 @@ impl<'src, 't> Parser<'src, 't> {
         let debug: bool = flags[0];
         let fastfail: bool = flags[1];
         self.fastfail = fastfail;
-        if debug { println!(); }
+        if debug {
+            println!();
+        }
 
         while let Some(cur) = self.cur() {
             match cur {
                 // skip newlines
                 Token::Newline => {
                     self.advance();
-                    continue
-                },
+                    continue;
+                }
 
                 // idents (read parse_ident)
                 Token::Identifier(_) => nodes.push(Stmt::Expr(self.parse_expr(0))),
@@ -372,18 +421,37 @@ impl<'src, 't> Parser<'src, 't> {
 
                     // specifiers are evaluated in this order
                     let constant = self.expect(|t| matches!(t, Token::Const)).is_some();
-                    let global   = self.expect(|t| matches!(t, Token::Static)).is_some();
-                    let mutable  = self.expect(|t| matches!(t, Token::Mutable)).is_some();
+                    let global = self.expect(|t| matches!(t, Token::Static)).is_some();
+                    let mutable = self.expect(|t| matches!(t, Token::Mutable)).is_some();
 
                     // ensure constant isnt used where it can't be
-                    if constant && mutable { panic!("constant cannot be used in tandem with mutable."); }
-                    if constant && global { panic!("constant cannot be used in tandem with static."); }
+                    if constant && mutable {
+                        self.error(
+                            &mut errors,
+                            SyntaxError::Parse(ParseError::ConstDisallowed(
+                                "constant cannot be used in tandem with mutable.",
+                            )),
+                        );
+                    }
+                    if constant && global {
+                        self.error(
+                            &mut errors,
+                            SyntaxError::Parse(ParseError::ConstDisallowed(
+                                "constant cannot be used in tandem with static.",
+                            )),
+                        );
+                    }
 
                     // consume name (TODO: add let _)
                     let name: Ident<'_> = match self.expect(|t| matches!(t, Token::Identifier(_))) {
                         Some(Token::Identifier(name)) => Ident(name),
                         _ => {
-                            self.error(SyntaxError::Parse(ParseError::MissingExpected("let must have an identifier afterwards")));
+                            self.error(
+                                &mut errors,
+                                SyntaxError::Parse(ParseError::MissingExpected(
+                                    "let must have an identifier afterwards",
+                                )),
+                            );
                             continue;
                         }
                     };
@@ -393,7 +461,9 @@ impl<'src, 't> Parser<'src, 't> {
                         self.advance();
 
                         // TODO: add support for array and generic types
-                        match self.expect(|t| matches!(t, Token::Identifier(_) | Token::Unit | Token::Underscore)) {
+                        match self.expect(|t| {
+                            matches!(t, Token::Identifier(_) | Token::Unit | Token::Underscore)
+                        }) {
                             Some(Token::Identifier(typname)) => match *typname {
                                 "i8" => Type::I8,
                                 "u8" => Type::U8,
@@ -417,16 +487,20 @@ impl<'src, 't> Parser<'src, 't> {
 
                             // push missing type after :
                             _ => {
-                                errors.push(
-                                    self.error(SyntaxError::Parse(ParseError::MissingExpected("expected type name after ':'")))
+                                self.error(
+                                    &mut errors,
+                                    SyntaxError::Parse(ParseError::MissingExpected(
+                                        "expected type name after ':'",
+                                    )),
                                 );
                                 continue;
-                            },
+                            }
                         }
                     }
-
-                    // (if no annotation the type is inferred by the compiler) 
-                    else { Type::Inferred };
+                    // (if no annotation the type is inferred by the compiler)
+                    else {
+                        Type::Inferred
+                    };
 
                     // expected equals to get to right hand of assignment (if none it's a decl)
                     let mut init = None;
@@ -435,11 +509,14 @@ impl<'src, 't> Parser<'src, 't> {
 
                         match self.cur().unwrap_or(&Token::Error) {
                             Token::Error | Token::Newline | Token::Semicolon => {
-                                errors.push(self.error(SyntaxError::Parse(
-                                    ParseError::MissingExpected("expected expression after '='")
-                                )));
+                                self.error(
+                                    &mut errors,
+                                    SyntaxError::Parse(ParseError::MissingExpected(
+                                        "expected expression after '='",
+                                    )),
+                                );
                                 continue;
-                            },
+                            }
 
                             _ => {
                                 init = Some(self.parse_expr(0));
@@ -448,13 +525,24 @@ impl<'src, 't> Parser<'src, 't> {
                     }
 
                     // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
-                    
-                    if typ == Type::Inferred && init.is_none() { 
-                        self.error(SyntaxError::Parse(ParseError::MissingExpected("type cannot be inferred without a right hand side")));
+                    if typ == Type::Inferred && init.is_none() {
+                        self.error(
+                            &mut errors,
+                            SyntaxError::Parse(ParseError::MissingExpected(
+                                "type cannot be inferred without a right hand side",
+                            )),
+                        );
                         continue;
                     }
 
-                    nodes.push(Stmt::VarDecl { name, typ, init, mutable, constant, global })
+                    nodes.push(Stmt::VarDecl {
+                        name,
+                        typ,
+                        init,
+                        mutable,
+                        constant,
+                        global,
+                    })
                 }
 
                 // control flow: this dont seem right but...
@@ -463,7 +551,9 @@ impl<'src, 't> Parser<'src, 't> {
 
                 // TODO: wire this to the SyntaxError setup i alr have
                 _ => {
-                    if debug { println!("not implemented: {cur}"); }
+                    if debug {
+                        println!("not implemented: {cur}");
+                    }
                     self.advance();
                     continue;
                 }
@@ -475,7 +565,12 @@ impl<'src, 't> Parser<'src, 't> {
 
             // TODO: make the compiler warn on unnecessary semicolon
             if !(self.matches(&Token::Newline) || self.matches(&Token::Semicolon)) {
-                self.error(SyntaxError::Parse(ParseError::MissingExpected("all statements must be followed by either a newline or semicolon")));
+                self.error(
+                    &mut errors,
+                    SyntaxError::Parse(ParseError::MissingExpected(
+                        "all statements must be followed by either a newline or semicolon",
+                    )),
+                );
                 continue;
             }
 
@@ -493,9 +588,7 @@ impl<'src, 't> Parser<'src, 't> {
 
         if errors.is_empty() {
             Ok(nodes)
-        }
-
-        else {
+        } else {
             Err(errors)
         }
     }
@@ -503,6 +596,6 @@ impl<'src, 't> Parser<'src, 't> {
 
 impl<'src, 't> fmt::Display for Parser<'src, 't> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        todo!("have to do the display")
     }
 }

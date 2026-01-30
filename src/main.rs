@@ -5,8 +5,8 @@ mod parser;
 
 // gotta work on this name but now im tired
 use crate::{
-    error::{dump, Diagnostic},
-    lexer::{lex},
+    error::{Diagnostic, dump},
+    lexer::lex,
     parser::{Parser, ast::Stmt},
 };
 
@@ -24,8 +24,7 @@ fn log_errors(errors: &Vec<Diagnostic<'_, '_>>, flags: Vec<bool>) {
 
     // debug flag
     if flags[0] {
-        dump(errors, "lastrun.log")
-            .unwrap_or_else(|_| eprintln!("Failed to dump errors."));
+        dump(errors, "lastrun.log").unwrap_or_else(|_| eprintln!("Failed to dump errors."));
     }
 
     println!("\n(!) {} errors found.", errors.len());
@@ -77,7 +76,9 @@ fn main() {
         }
     };
 
-    if flags[0] { press_btn_continue::wait("Press any button to continue to parsing.").unwrap(); }
+    if flags[0] {
+        press_btn_continue::wait("Press any button to continue to parsing.").unwrap();
+    }
     let mut parser = Parser {
         path: &path,
         src: &src,
@@ -95,5 +96,10 @@ fn main() {
         }
     };
 
-    if flags[0] { press_btn_continue::wait("Press any button to continue to semantic analysis and the opt layer. (not done yet)").unwrap(); }
+    if flags[0] {
+        press_btn_continue::wait(
+            "Press any button to continue to semantic analysis and the opt layer. (not done yet)",
+        )
+        .unwrap();
+    }
 }

@@ -1,5 +1,5 @@
-pub mod errors;
 pub mod diagnostic;
+pub mod errors;
 
-pub use errors::{SyntaxError, ParseError, lex_err};
 pub use diagnostic::{Diagnostic, dump};
+pub use errors::{ParseError, SyntaxError, lex_err};

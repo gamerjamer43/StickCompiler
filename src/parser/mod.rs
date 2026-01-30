@@ -1,4 +1,4 @@
 pub mod ast;
 pub mod parse;
 
-pub use parse::{Parser};
+pub use parse::Parser;

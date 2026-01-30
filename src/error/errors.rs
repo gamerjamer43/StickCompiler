@@ -35,7 +35,11 @@ pub enum LexError<'src> {
 /// a generic error for anything that may happen during parsing.
 #[derive(Debug, PartialEq, Clone, AsRefStr)]
 pub enum ParseError<'src> {
+    // an expected token is missing
     MissingExpected(&'src str),
+
+    // const is not allowed in tandem w this variable
+    ConstDisallowed(&'src str),
 }
 
 /// unified place to hold any error that may happen during compile time
@@ -73,8 +77,9 @@ impl Display for SyntaxError<'_> {
             // parse errors
             SyntaxError::Parse(pe) => {
                 use ParseError::*;
-                match pe {
-                    &MissingExpected(s) => write!(f, "missing a value where expected, {s}"),
+                match &pe {
+                    MissingExpected(s) => write!(f, "missing a value where expected, {s}"),
+                    ConstDisallowed(s) => write!(f, "const cannot be used with some modifiers: {s}"),
                 }
             }
 
@@ -105,5 +110,3 @@ pub fn lex_err<'src>(lex: &mut Lexer<'src, Token<'src>>) -> SyntaxError<'src> {
         None => SyntaxError::Unknown,
     }
 }
-
-// TODO: add the same for parse error
