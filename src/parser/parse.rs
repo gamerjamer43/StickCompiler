@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
 use core::fmt;
-use std::{ops::Range, process::exit, time::Instant};
+use std::{ops::Range, process::exit, time::Instant, mem::take};
 
 use super::ast::*;
 use crate::error::{Diagnostic, ParseError, SyntaxError};
@@ -15,6 +15,7 @@ pub struct Parser<'src, 't> {
     pub spans: &'t [Range<usize>],
     pub pos: usize,
     pub fastfail: bool,
+    pub errors: Vec<Diagnostic<'t, 'src>>
 }
 
 impl<'src, 't> Parser<'src, 't> {
@@ -35,7 +36,7 @@ impl<'src, 't> Parser<'src, 't> {
     }
 
     #[inline]
-    fn error(&self, errors: &mut Vec<Diagnostic<'t, 'src>>, err: SyntaxError<'src>) {
+    fn error(&mut self, err: SyntaxError<'src>) {
         let diag: Diagnostic<'_, '_> = Diagnostic {
             path: self.path,
             src: self.src,
@@ -50,7 +51,7 @@ impl<'src, 't> Parser<'src, 't> {
             exit(0);
         }
 
-        errors.push(diag);
+        self.errors.push(diag);
     }
 
     #[inline]
@@ -391,9 +392,132 @@ impl<'src, 't> Parser<'src, 't> {
         }
     }
 
+    pub fn parse_let(&mut self) -> Result<Stmt<'src>, SyntaxError<'src>> {
+        self.advance();
+
+        // specifiers are evaluated in this order
+        let constant = self.expect(|t| matches!(t, Token::Const)).is_some();
+        let global = self.expect(|t| matches!(t, Token::Static)).is_some();
+        let mutable = self.expect(|t| matches!(t, Token::Mutable)).is_some();
+
+        // ensure constant isnt used where it can't be
+        if constant && mutable {
+            self.error(
+                SyntaxError::Parse(ParseError::ConstDisallowed(
+                    "constant cannot be used in tandem with mutable.",
+                )),
+            );
+        }
+        if constant && global {
+            self.error(
+                SyntaxError::Parse(ParseError::ConstDisallowed(
+                    "constant cannot be used in tandem with static.",
+                )),
+            );
+        }
+
+        // consume name (TODO: add let _)
+        let name: Ident<'_> = match self.expect(|t| matches!(t, Token::Identifier(_))) {
+            Some(Token::Identifier(name)) => Ident(name),
+            _ => {
+                return Err(
+                    SyntaxError::Parse(ParseError::MissingExpected(
+                        "let must have an identifier afterwards",
+                    ))
+                )
+                // continue;
+            }
+        };
+
+        // consume annotation
+        let typ: Type<'_> = if self.matches(&Token::Colon) {
+            self.advance();
+
+            // TODO: add support for array and generic types
+            match self.expect(|t| {
+                matches!(t, Token::Identifier(_) | Token::Unit | Token::Underscore)
+            }) {
+                Some(Token::Identifier(typname)) => match *typname {
+                    "i8" => Type::I8,
+                    "u8" => Type::U8,
+                    "i16" => Type::I16,
+                    "u16" => Type::U16,
+                    "i32" => Type::I32,
+                    "u32" => Type::U32,
+                    "i64" => Type::I64,
+                    "u64" => Type::U64,
+                    "f32" => Type::F32,
+                    "f64" => Type::F64,
+                    "bool" => Type::Bool,
+                    "char" => Type::Char,
+                    "str" => Type::Str,
+                    _ => Type::Ident(Ident(typname)),
+                },
+
+                // unit type and inferred have to be handled seperately
+                Some(Token::Unit) => Type::Unit,
+                Some(Token::Underscore) => Type::Inferred,
+
+                // push missing type after :
+                _ => {
+                    return Err(
+                        SyntaxError::Parse(ParseError::MissingExpected(
+                            "expected type name after ':'",
+                        )),
+                    );
+                }
+            }
+        }
+
+        // (if no annotation the type is inferred by the compiler)
+        else {
+            Type::Inferred
+        };
+
+        // expected equals to get to right hand of assignment (if none it's a decl)
+        let mut init = None;
+        if self.matches(&Token::Assign) {
+            self.advance();
+
+            match self.cur().unwrap_or(&Token::Error) {
+                Token::Error | Token::Newline | Token::Semicolon => {
+                    return Err(
+                        SyntaxError::Parse(ParseError::MissingExpected(
+                            "expected expression after '='",
+                        )),
+                    );
+                }
+
+                _ => {
+                    init = Some(self.parse_expr(0));
+                }
+            }
+        }
+
+        // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
+        if typ == Type::Inferred && init.is_none() {
+            return Err(
+                SyntaxError::Parse(ParseError::MissingExpected(
+                    "type cannot be inferred without a right hand side",
+                )),
+            );
+        }
+
+        // we did it!!!!
+        Ok(
+            Stmt::VarDecl {
+                name,
+                typ,
+                init,
+                mutable,
+                constant,
+                global,
+            }
+        )
+    }
+
     pub fn parse(&mut self, flags: &[bool]) -> Result<Vec<Stmt<'src>>, Vec<Diagnostic<'t, 'src>>> {
         let mut nodes: Vec<Stmt<'src>> = Vec::new();
-        let mut errors: Vec<Diagnostic<'t, 'src>> = Vec::new();
         let start: Instant = Instant::now();
 
         // resolve flags
@@ -416,133 +540,9 @@ impl<'src, 't> Parser<'src, 't> {
                 Token::Identifier(_) => nodes.push(Stmt::Expr(self.parse_expr(0))),
 
                 // TODO: see how we can break some of this down
-                Token::Let => {
-                    self.advance();
-
-                    // specifiers are evaluated in this order
-                    let constant = self.expect(|t| matches!(t, Token::Const)).is_some();
-                    let global = self.expect(|t| matches!(t, Token::Static)).is_some();
-                    let mutable = self.expect(|t| matches!(t, Token::Mutable)).is_some();
-
-                    // ensure constant isnt used where it can't be
-                    if constant && mutable {
-                        self.error(
-                            &mut errors,
-                            SyntaxError::Parse(ParseError::ConstDisallowed(
-                                "constant cannot be used in tandem with mutable.",
-                            )),
-                        );
-                    }
-                    if constant && global {
-                        self.error(
-                            &mut errors,
-                            SyntaxError::Parse(ParseError::ConstDisallowed(
-                                "constant cannot be used in tandem with static.",
-                            )),
-                        );
-                    }
-
-                    // consume name (TODO: add let _)
-                    let name: Ident<'_> = match self.expect(|t| matches!(t, Token::Identifier(_))) {
-                        Some(Token::Identifier(name)) => Ident(name),
-                        _ => {
-                            self.error(
-                                &mut errors,
-                                SyntaxError::Parse(ParseError::MissingExpected(
-                                    "let must have an identifier afterwards",
-                                )),
-                            );
-                            continue;
-                        }
-                    };
-
-                    // consume annotation
-                    let typ: Type<'_> = if self.matches(&Token::Colon) {
-                        self.advance();
-
-                        // TODO: add support for array and generic types
-                        match self.expect(|t| {
-                            matches!(t, Token::Identifier(_) | Token::Unit | Token::Underscore)
-                        }) {
-                            Some(Token::Identifier(typname)) => match *typname {
-                                "i8" => Type::I8,
-                                "u8" => Type::U8,
-                                "i16" => Type::I16,
-                                "u16" => Type::U16,
-                                "i32" => Type::I32,
-                                "u32" => Type::U32,
-                                "i64" => Type::I64,
-                                "u64" => Type::U64,
-                                "f32" => Type::F32,
-                                "f64" => Type::F64,
-                                "bool" => Type::Bool,
-                                "char" => Type::Char,
-                                "str" => Type::Str,
-                                _ => Type::Ident(Ident(typname)),
-                            },
-
-                            // unit type and inferred have to be handled seperately
-                            Some(Token::Unit) => Type::Unit,
-                            Some(Token::Underscore) => Type::Inferred,
-
-                            // push missing type after :
-                            _ => {
-                                self.error(
-                                    &mut errors,
-                                    SyntaxError::Parse(ParseError::MissingExpected(
-                                        "expected type name after ':'",
-                                    )),
-                                );
-                                continue;
-                            }
-                        }
-                    }
-                    // (if no annotation the type is inferred by the compiler)
-                    else {
-                        Type::Inferred
-                    };
-
-                    // expected equals to get to right hand of assignment (if none it's a decl)
-                    let mut init = None;
-                    if self.matches(&Token::Assign) {
-                        self.advance();
-
-                        match self.cur().unwrap_or(&Token::Error) {
-                            Token::Error | Token::Newline | Token::Semicolon => {
-                                self.error(
-                                    &mut errors,
-                                    SyntaxError::Parse(ParseError::MissingExpected(
-                                        "expected expression after '='",
-                                    )),
-                                );
-                                continue;
-                            }
-
-                            _ => {
-                                init = Some(self.parse_expr(0));
-                            }
-                        }
-                    }
-
-                    // can't automatically deduce type on assignment (maybe make it so that the type is filled when assigned to?)
-                    if typ == Type::Inferred && init.is_none() {
-                        self.error(
-                            &mut errors,
-                            SyntaxError::Parse(ParseError::MissingExpected(
-                                "type cannot be inferred without a right hand side",
-                            )),
-                        );
-                        continue;
-                    }
-
-                    nodes.push(Stmt::VarDecl {
-                        name,
-                        typ,
-                        init,
-                        mutable,
-                        constant,
-                        global,
-                    })
+                Token::Let => match self.parse_let() {
+                    Ok(stmt) => nodes.push(stmt),
+                    Err(e) => self.error(e),
                 }
 
                 // control flow: this dont seem right but...
@@ -566,7 +566,6 @@ impl<'src, 't> Parser<'src, 't> {
             // TODO: make the compiler warn on unnecessary semicolon
             if !(self.matches(&Token::Newline) || self.matches(&Token::Semicolon)) {
                 self.error(
-                    &mut errors,
                     SyntaxError::Parse(ParseError::MissingExpected(
                         "all statements must be followed by either a newline or semicolon",
                     )),
@@ -586,10 +585,11 @@ impl<'src, 't> Parser<'src, 't> {
             start.elapsed().as_secs_f64()
         );
 
-        if errors.is_empty() {
+        if self.errors.is_empty() {
             Ok(nodes)
         } else {
-            Err(errors)
+            // i prolly dont have to do a move here... but wtv for rn
+            Err(take(&mut self.errors))
         }
     }
 }

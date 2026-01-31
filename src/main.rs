@@ -86,6 +86,7 @@ fn main() {
         spans: &lexed.spans,
         pos: 0,
         fastfail: flags[1],
+        errors: Vec::new(),
     };
 
     let _ast: Vec<Stmt<'_>> = match parser.parse(&flags) {

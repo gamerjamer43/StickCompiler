@@ -17,3 +17,18 @@ press-btn-continue = "0.2" # i'm fucking lazy ok
 
 # 3 deps, simple helper for converting enum value to str
 strum_macros = "0.27.2"
+
+# if you REALLY care use 16 codegen units and no lto... but these settings r p good
+# 1 codegen unit = best opt. no need to split ts into 16 units (unless ur compile time is slow)
+# thin is most opts & fast(ish) compile, fat just gave me 0.00000x seconds tho...
+[profile.release]
+codegen-units = 1
+opt-level = 3 # just in case
+lto = "fat"
+
+# the entire build is like 200mb, and the bin is like 300kb
+# but if you want it light:
+# 
+# codegen-units = 8
+# opt-level = "s" # or "z" if you need EVEN SMALLER
+# lto = "thin" # or none if you really don't want lto
